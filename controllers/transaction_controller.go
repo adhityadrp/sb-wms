@@ -4,12 +4,22 @@ import (
 	"net/http"
 	"sb-wms/config"
 	"sb-wms/models"
-
-	// "strconv"
-
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
+
+func GetTransactions(c *gin.Context) {
+	var txs []models.Transaction
+	if err := config.DB.
+		Preload("User").
+		Preload("Item").
+		Preload("Item.Category").
+		Find(&txs).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, txs)
+}
 
 func CreateTransaction(c *gin.Context) {
 	var in struct {
@@ -26,7 +36,6 @@ func CreateTransaction(c *gin.Context) {
 	uid, _ := c.Get("user_id")
 	userID := uid.(uint)
 
-	// find item
 	var item models.Item
 	if err := config.DB.First(&item, in.ItemID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "item not found"})
@@ -46,7 +55,6 @@ func CreateTransaction(c *gin.Context) {
 		return
 	}
 
-	// update item and create transaction
 	tx := models.Transaction{
 		UserID: userID,
 		ItemID: in.ItemID,
@@ -63,22 +71,23 @@ func CreateTransaction(c *gin.Context) {
 		}
 		return nil
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "transaction failed"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// 🔥 Setelah sukses create, preload relasi user & item
 	if err := config.DB.
 		Preload("User").
 		Preload("Item").
 		Preload("Item.Category").
 		First(&tx, tx.ID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load transaction data"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message":      "transaction recorded",
-		"transaction":  tx,
+		"message":     "transaction recorded",
+		"transaction": tx,
 	})
 }
+
+

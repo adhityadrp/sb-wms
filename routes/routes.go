@@ -34,17 +34,10 @@ func SetupRouter() *gin.Engine {
 			protected.DELETE("/items/:id", controllers.DeleteItem)
 
 			// transactions
+			protected.GET("/transactions", controllers.GetTransactions)
 			protected.POST("/transactions", controllers.CreateTransaction)
 		}
 
-		// example admin route with basic auth
-		admin := api.Group("/admin")
-		admin.Use(middlewares.BasicAuthMiddleware())
-		{
-			admin.GET("/health", func(c *gin.Context) {
-				c.JSON(200, gin.H{"ok": true})
-			})
-		}
 	}
 
 	return r

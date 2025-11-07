@@ -8,17 +8,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetCategories mengambil semua kategori dari database dan mengembalikannya sebagai JSON
 func GetCategories(c *gin.Context) {
 	var cats []models.Category
 	if err := config.DB.Find(&cats).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get categories"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, cats)
 }
 
-// CreateCategory membuat kategori baru berdasarkan input JSON dan menyimpannya ke database
 func CreateCategory(c *gin.Context) {
 	var in models.Category
 	if err := c.ShouldBindJSON(&in); err != nil || in.Name == "" {
@@ -27,13 +25,12 @@ func CreateCategory(c *gin.Context) {
 	}
 	cat := models.Category{Name: in.Name}
 	if err := config.DB.Create(&cat).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed create"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, cat)
 }
 
-// GetCategoryByID mengambil kategori berdasarkan ID dari URL parameter, termasuk item-item yang terkait
 func GetCategoryByID(c *gin.Context) {
 	id := c.Param("id")
 	var cat models.Category
@@ -44,17 +41,6 @@ func GetCategoryByID(c *gin.Context) {
 	c.JSON(http.StatusOK, cat)
 }
 
-// DeleteCategory menghapus kategori berdasarkan ID dari URL parameter
-func DeleteCategory(c *gin.Context) {
-	id := c.Param("id")
-	if err := config.DB.Delete(&models.Category{}, id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "delete failed"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
-}
-
-// UpdateCategory memperbarui kategori berdasarkan ID dari URL parameter dengan data baru dari JSON
 func UpdateCategory(c *gin.Context) {
 	id := c.Param("id")
 	var cat models.Category
@@ -73,8 +59,36 @@ func UpdateCategory(c *gin.Context) {
 
 	cat.Name = in.Name
 	if err := config.DB.Save(&cat).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, cat)
 }
+
+func DeleteCategory(c *gin.Context) {
+	id := c.Param("id")
+
+	// Cek apakah ada transaksi yang terkait dengan item di kategori ini
+	var count int64
+	if err := config.DB.Model(&models.Transaction{}).
+		Joins("JOIN items ON transactions.item_id = items.id").
+		Where("items.category_id = ?", id).
+		Count(&count).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if count > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Terdapat transaksi terkait, tidak dapat menghapus kategori"})
+		return
+	}
+
+	// Jika tidak ada transaksi, hapus kategori (cascade akan hapus items)
+	if err := config.DB.Delete(&models.Category{}, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+}
+
+

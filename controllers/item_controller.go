@@ -11,7 +11,7 @@ import (
 func GetItems(c *gin.Context) {
 	var items []models.Item
 	if err := config.DB.Preload("Category").Find(&items).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve items"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, items)
@@ -30,12 +30,12 @@ func CreateItem(c *gin.Context) {
 	}
 
 	if err := config.DB.Create(&in).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "create failed"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	if err := config.DB.Preload("Category").First(&in, in.ID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load category"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -52,16 +52,6 @@ func GetItemByID(c *gin.Context) {
 	c.JSON(http.StatusOK, it)
 }
 
-func DeleteItem(c *gin.Context) {
-	id := c.Param("id")
-	if err := config.DB.Delete(&models.Item{}, id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "delete failed"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
-}
-
-// UpdateItem memperbarui item berdasarkan ID dari URL parameter dengan data baru dari JSON
 func UpdateItem(c *gin.Context) {
 	id := c.Param("id")
 	var it models.Item
@@ -94,15 +84,38 @@ func UpdateItem(c *gin.Context) {
 	it.Price = in.Price
 
 	if err := config.DB.Save(&it).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	var updated models.Item
 	if err := config.DB.Preload("Category").First(&updated, it.ID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load category"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, updated)
 }
+
+func DeleteItem(c *gin.Context) {
+	id := c.Param("id")
+
+	var count int64
+	if err := config.DB.Model(&models.Transaction{}).Where("item_id = ?", id).Count(&count).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if count > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Ada transaksi terkait, Item tidak bisa dihapus"})
+		return
+	}
+
+	if err := config.DB.Delete(&models.Item{}, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+}
+
+
