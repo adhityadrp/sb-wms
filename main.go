@@ -8,7 +8,6 @@ import (
 	"sb-wms/models"
 	"sb-wms/routes"
 	"sb-wms/seeders"
-
 	"github.com/joho/godotenv"
 )
 
@@ -25,7 +24,7 @@ func main() {
 	); err != nil {
 		log.Fatal("❌ Migrate failed:", err)
 	}
-	
+
 	// Run seeders
 	seeders.Run()
 
